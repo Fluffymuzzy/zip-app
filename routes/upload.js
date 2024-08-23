@@ -80,17 +80,13 @@ const processArchive = async (tempDir, htmlFiles) => {
 };
 
 router.post("/", (req, res) => {
-  console.log("Starting file upload...");
   upload(req, res, (err) => {
     if (err instanceof multer.MulterError) {
-      console.error("Multer error:", err.message);
       res.status(500).send("Error uploading file: " + err.message);
     } else if (err) {
-      console.error("Validation error:", err.message);
       res.status(400).send("Error validating file: " + err.message);
     } else {
       if (req.file && req.file.originalname) {
-        console.log("File uploaded:", req.file.originalname);
         const filePath = path.join(UPLOAD_DIR, req.file.originalname);
         const tempDir = path.join(UPLOAD_DIR, uuidv4());
 
@@ -101,18 +97,14 @@ router.post("/", (req, res) => {
         fs.createReadStream(filePath)
           .pipe(unzipper.Parse())
           .on("entry", async function (entry) {
-            console.log("Processing entry:", entry.path);
             await handleFileEntry(entry, tempDir);
           })
           .on("close", async () => {
-            console.log("Unzipping completed.");
             try {
               const htmlFiles = await runWorker({
                 tempDir,
                 action: "findHtmlFiles",
               });
-
-              console.log("HTML files found:", htmlFiles);
 
               let attempts = 0;
               let success = false;
@@ -122,7 +114,6 @@ router.post("/", (req, res) => {
               while (attempts < MAX_RETRIES && !success) {
                 attempts++;
                 startTime = Date.now();
-                console.log(`Attempt ${attempts} of ${MAX_RETRIES}`);
 
                 try {
                   const timeoutPromise = new Promise((_, reject) =>
@@ -136,20 +127,7 @@ router.post("/", (req, res) => {
                     timeoutPromise,
                   ]);
                   success = true;
-                  const elapsedTime = (Date.now() - startTime) / 1000;
-                  console.log(
-                    `Rendering completed in ${elapsedTime.toFixed(
-                      2
-                    )} seconds on attempt ${attempts}`
-                  );
                 } catch (error) {
-                  const elapsedTime = (Date.now() - startTime) / 1000;
-                  console.error(
-                    `Attempt ${attempts} failed after ${elapsedTime.toFixed(
-                      2
-                    )} seconds:`,
-                    error.message
-                  );
                   if (attempts === MAX_RETRIES) {
                     throw error;
                   }
@@ -162,14 +140,12 @@ router.post("/", (req, res) => {
                 elapsedTime: (Date.now() - startTime) / 1000,
               });
             } catch (error) {
-              console.error("Processing failed:", error.message);
               res.status(500).send("Processing failed");
             } finally {
               clearUploads();
             }
           });
       } else {
-        console.error("No file received.");
         res.status(400).send("File upload failed: No file received");
       }
     }
