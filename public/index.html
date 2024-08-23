@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>File Upload</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+
+    h1 {
+      color: #333;
+    }
+
+    form {
+      margin-bottom: 20px;
+    }
+
+    #result {
+      border: 1px solid #ccc;
+      padding: 10px;
+      background-color: #f9f9f9;
+    }
+
+    img {
+      max-width: 100%;
+      height: auto;
+    }
+
+    #spinner {
+      display: none;
+      margin-top: 20px;
+    }
+
+    #spinner img {
+      width: 50px;
+      height: 50px;
+    }
+
+    #timer {
+      margin-top: 10px;
+      font-size: 18px;
+      color: #555;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Upload a ZIP File</h1>
+  <form id="uploadForm" enctype="multipart/form-data">
+    <input type="file" id="fileInput" name="archive" accept=".zip" required>
+    <button type="submit">Upload</button>
+  </form>
+  <div id="spinner" style="display: none;">
+    <img src="spinner.gif" alt="Loading...">
+    <div id="timer">Elapsed time: 0 seconds</div>
+  </div>
+  <div id="attempts"></div>
+  <div id="result"></div>
+
+  <script>
+    document.getElementById('uploadForm').addEventListener('submit', async function (event) {
+      event.preventDefault();
+      const fileInput = document.getElementById('fileInput');
+      const formData = new FormData();
+      formData.append('archive', fileInput.files[0]);
+
+      const spinner = document.getElementById('spinner');
+      const timer = document.getElementById('timer');
+      const resultDiv = document.getElementById('result');
+      const attemptsDiv = document.getElementById('attempts');
+      let elapsedTime = 0;
+      let timerInterval;
+
+      try {
+        if (spinner) spinner.style.display = 'block';
+        if (resultDiv) resultDiv.innerHTML = '';
+        if (attemptsDiv) attemptsDiv.innerHTML = '';
+        if (timer) {
+          timerInterval = setInterval(() => {
+            elapsedTime++;
+            timer.textContent = `Elapsed time: ${elapsedTime} seconds`;
+          }, 1000);
+        }
+
+        const response = await fetch('/upload', {
+          method: 'POST',
+          body: formData
+        });
+
+        clearInterval(timerInterval);
+        if (spinner) spinner.style.display = 'none';
+
+        if (response.ok) {
+          const data = await response.json();
+          if (attemptsDiv) {
+            attemptsDiv.textContent = `Rendering completed in ${data.attempts} attempt(s). Total time: ${data.elapsedTime.toFixed(2)} seconds`;
+          }
+          if (resultDiv) {
+            data.screenshots.forEach(item => {
+              if (item.screenshot) {
+                const img = document.createElement('img');
+                img.src = `data:image/png;base64,${item.screenshot}`;
+                resultDiv.appendChild(img);
+              } else {
+                const errorText = document.createElement('p');
+                errorText.textContent = `Error rendering ${item.file}: ${item.error}`;
+                resultDiv.appendChild(errorText);
+              }
+            });
+          }
+        } else {
+          const errorText = await response.text();
+          if (resultDiv) resultDiv.innerHTML = `<p>Error: ${errorText}</p>`;
+        }
+      } catch (error) {
+        clearInterval(timerInterval);
+        if (spinner) spinner.style.display = 'none';
+        if (resultDiv) resultDiv.innerHTML = `<p>Error: ${error.message}</p>`;
+      }
+    });
+  </script>
+</body>
+
+</html>
